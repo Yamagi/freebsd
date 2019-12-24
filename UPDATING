@@ -74,6 +74,10 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 	as a module and you compile a custom set of modules, then you should
 	add superio to the set.
 
+20191022:
+	hwpstate has been renamed to hwpstate_amd. Custom configurations must be
+	modified accordingly.
+
 20191021:
 	KPIs for network drivers to access interface addresses have changed.
 	Users need to recompile NIC driver modules together with kernel.
