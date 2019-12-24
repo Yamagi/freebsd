@@ -490,7 +490,7 @@ dump_isrvec_stk(struct vlapic *vlapic)
  * Algorithm adopted from section "Interrupt, Task and Processor Priority"
  * in Intel Architecture Manual Vol 3a.
  */
-static void
+void
 vlapic_update_ppr(struct vlapic *vlapic)
 {
 	int isrvec, tpr, ppr;
