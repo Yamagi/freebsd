@@ -2328,7 +2328,7 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 	}
 
 	/*
-	 * If 'TPR shadowing' is used, update the local APICs PPR.
+	 * If TPR Shadowing is enabled, update the local APICs PPR.
 	 */
 	if (tpr_shadowing) {
 		vlapic = vm_lapic(vmx->vm, vcpu);
@@ -2680,6 +2680,10 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		SDT_PROBE3(vmm, vmx, exit, mwait, vmx, vcpu, vmexit);
 		vmexit->exitcode = VM_EXITCODE_MWAIT;
 		break;
+	case EXIT_REASON_TPR:
+		vmexit->inst_length = 0;
+		handled = HANDLED;
+		break;
 	case EXIT_REASON_VMCALL:
 	case EXIT_REASON_VMCLEAR:
 	case EXIT_REASON_VMLAUNCH:
@@ -2963,6 +2967,14 @@ vmx_run(void *arg, int vcpu, register_t rip, pmap_t pmap,
 			enable_intr();
 			vm_exit_debug(vmx->vm, vcpu, rip);
 			break;
+		}
+
+		/*
+		 * If TPR Shadowing is enabled, the TPR Threshold
+		 * must be updated right before entering the guest.
+		 */
+		if (tpr_shadowing) {
+			vmcs_write(VMCS_TPR_THRESHOLD, vlapic_get_cr8(vlapic));
 		}
 
 		/*
