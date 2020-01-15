@@ -2330,7 +2330,7 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 	/*
 	 * If TPR Shadowing is enabled, update the local APICs PPR.
 	 */
-	if (tpr_shadowing) {
+	if (tpr_shadowing && !virtual_interrupt_delivery) {
 		vlapic = vm_lapic(vmx->vm, vcpu);
 		vlapic_update_ppr(vlapic);
 	}
@@ -2973,7 +2973,7 @@ vmx_run(void *arg, int vcpu, register_t rip, pmap_t pmap,
 		 * If TPR Shadowing is enabled, the TPR Threshold
 		 * must be updated right before entering the guest.
 		 */
-		if (tpr_shadowing) {
+		if (tpr_shadowing && !virtual_interrupt_delivery) {
 			vmcs_write(VMCS_TPR_THRESHOLD, vlapic_get_cr8(vlapic));
 		}
 
