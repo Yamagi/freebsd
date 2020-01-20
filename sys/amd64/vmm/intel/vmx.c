@@ -2331,8 +2331,10 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 	 * If TPR Shadowing is enabled, update the local APICs PPR.
 	 */
 	if (tpr_shadowing && !virtual_interrupt_delivery) {
-		vlapic = vm_lapic(vmx->vm, vcpu);
-		vlapic_update_ppr(vlapic);
+		if ((vmx->cap[vcpu].proc_ctls & PROCBASED_USE_TPR_SHADOW) != 0) {
+			vlapic = vm_lapic(vmx->vm, vcpu);
+			vlapic_update_ppr(vlapic);
+		}
 	}
 
 	switch (reason) {
@@ -2974,7 +2976,9 @@ vmx_run(void *arg, int vcpu, register_t rip, pmap_t pmap,
 		 * must be updated right before entering the guest.
 		 */
 		if (tpr_shadowing && !virtual_interrupt_delivery) {
-			vmcs_write(VMCS_TPR_THRESHOLD, vlapic_get_cr8(vlapic));
+			if ((vmx->cap[vcpu].proc_ctls & PROCBASED_USE_TPR_SHADOW) != 0) {
+				vmcs_write(VMCS_TPR_THRESHOLD, vlapic_get_cr8(vlapic));
+			}
 		}
 
 		/*
@@ -3665,7 +3669,30 @@ vmx_set_tmr(struct vlapic *vlapic, int vector, bool level)
 }
 
 static void
-vmx_enable_x2apic_mode(struct vlapic *vlapic)
+vmx_enable_x2apic_mode_ts(struct vlapic *vlapic)
+{
+	struct vmx *vmx;
+	struct vmcs *vmcs;
+	uint32_t proc_ctls;
+	int vcpuid;
+
+	vcpuid = vlapic->vcpuid;
+	vmx = ((struct vlapic_vtx *)vlapic)->vmx;
+	vmcs = &vmx->vmcs[vcpuid];
+
+	proc_ctls = vmx->cap[vcpuid].proc_ctls;
+	proc_ctls &= ~PROCBASED_USE_TPR_SHADOW;
+	proc_ctls |= PROCBASED_CR8_LOAD_EXITING;
+	proc_ctls |= PROCBASED_CR8_STORE_EXITING;
+	vmx->cap[vcpuid].proc_ctls = proc_ctls;
+
+	VMPTRLD(vmcs);
+	vmcs_write(VMCS_PRI_PROC_BASED_CTLS, proc_ctls);
+	VMCLEAR(vmcs);
+}
+
+static void
+vmx_enable_x2apic_mode_vid(struct vlapic *vlapic)
 {
 	struct vmx *vmx;
 	struct vmcs *vmcs;
@@ -3826,12 +3853,16 @@ vmx_vlapic_init(void *arg, int vcpuid)
 	vlapic_vtx->pir_desc = &vmx->pir_desc[vcpuid];
 	vlapic_vtx->vmx = vmx;
 
+	if (tpr_shadowing) {
+		vlapic->ops.enable_x2apic_mode = vmx_enable_x2apic_mode_ts;
+	}
+
 	if (virtual_interrupt_delivery) {
 		vlapic->ops.set_intr_ready = vmx_set_intr_ready;
 		vlapic->ops.pending_intr = vmx_pending_intr;
 		vlapic->ops.intr_accepted = vmx_intr_accepted;
 		vlapic->ops.set_tmr = vmx_set_tmr;
-		vlapic->ops.enable_x2apic_mode = vmx_enable_x2apic_mode;
+		vlapic->ops.enable_x2apic_mode = vmx_enable_x2apic_mode_vid;
 	}
 
 	if (posted_interrupts)
