@@ -1079,6 +1079,8 @@ vlapic_pending_intr(struct vlapic *vlapic, int *vecptr)
 	int	  	 idx, i, bitpos, vector;
 	uint32_t	*irrptr, val;
 
+	vlapic_update_ppr(vlapic);
+
 	if (vlapic->ops.pending_intr)
 		return ((*vlapic->ops.pending_intr)(vlapic, vecptr));
 
@@ -1136,7 +1138,6 @@ vlapic_intr_accepted(struct vlapic *vlapic, int vector)
 		panic("isrvec_stk_top overflow %d", stk_top);
 
 	vlapic->isrvec_stk[stk_top] = vector;
-	vlapic_update_ppr(vlapic);
 }
 
 void

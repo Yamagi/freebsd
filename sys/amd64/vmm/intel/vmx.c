@@ -2327,16 +2327,6 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		}
 	}
 
-	/*
-	 * If TPR Shadowing is enabled, update the local APICs PPR.
-	 */
-	if (tpr_shadowing && !virtual_interrupt_delivery) {
-		if ((vmx->cap[vcpu].proc_ctls & PROCBASED_USE_TPR_SHADOW) != 0) {
-			vlapic = vm_lapic(vmx->vm, vcpu);
-			vlapic_update_ppr(vlapic);
-		}
-	}
-
 	switch (reason) {
 	case EXIT_REASON_TASK_SWITCH:
 		ts = &vmexit->u.task_switch;
@@ -2683,6 +2673,8 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		vmexit->exitcode = VM_EXITCODE_MWAIT;
 		break;
 	case EXIT_REASON_TPR:
+		vlapic = vm_lapic(vmx->vm, vcpu);
+		vlapic_update_ppr(vlapic);
 		vmexit->inst_length = 0;
 		handled = HANDLED;
 		break;
