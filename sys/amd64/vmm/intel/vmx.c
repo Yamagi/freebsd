@@ -2674,7 +2674,7 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		break;
 	case EXIT_REASON_TPR:
 		vlapic = vm_lapic(vmx->vm, vcpu);
-		vlapic_update_ppr(vlapic);
+		vlapic_sync_tpr(vlapic);
 		vmexit->inst_length = 0;
 		handled = HANDLED;
 		break;

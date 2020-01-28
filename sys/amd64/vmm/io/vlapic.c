@@ -490,7 +490,7 @@ dump_isrvec_stk(struct vlapic *vlapic)
  * Algorithm adopted from section "Interrupt, Task and Processor Priority"
  * in Intel Architecture Manual Vol 3a.
  */
-void
+static void
 vlapic_update_ppr(struct vlapic *vlapic)
 {
 	int isrvec, tpr, ppr;
@@ -553,6 +553,12 @@ vlapic_update_ppr(struct vlapic *vlapic)
 
 	vlapic->apic_page->ppr = ppr;
 	VLAPIC_CTR1(vlapic, "vlapic_update_ppr 0x%02x", ppr);
+}
+
+void
+vlapic_sync_tpr(struct vlapic *vlapic)
+{
+	vlapic_update_ppr(vlapic);
 }
 
 static VMM_STAT(VLAPIC_GRATUITOUS_EOI, "EOI without any in-service interrupt");
