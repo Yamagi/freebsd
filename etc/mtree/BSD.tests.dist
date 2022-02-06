@@ -864,6 +864,8 @@
         ..
         vm
         ..
+        vmm
+        ..
     ..
     usr.bin
         apply

@@ -34,6 +34,7 @@
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/kernel.h>
+#include <sys/nv.h>
 #include <sys/_pthreadtypes.h>
 
 #include <dev/pci/pcireg.h>
@@ -52,7 +53,9 @@ struct pci_devemu {
 
 	/* instance creation */
 	int       (*pe_init)(struct vmctx *, struct pci_devinst *,
-			     char *opts);
+			     nvlist_t *);
+	int	(*pe_legacy_config)(nvlist_t *, const char *);
+	const char *pe_alias;
 
 	/* ACPI DSDT enumeration */
 	void	(*pe_write_dsdt)(struct pci_devinst *);
@@ -73,10 +76,14 @@ struct pci_devemu {
 				struct pci_devinst *pi, int baridx,
 				uint64_t offset, int size);
 
+	void	(*pe_baraddr)(struct vmctx *ctx, struct pci_devinst *pi,
+			      int baridx, int enabled, uint64_t address);
+
 	/* Save/restore device state */
 	int	(*pe_snapshot)(struct vm_snapshot_meta *meta);
 	int	(*pe_pause)(struct vmctx *ctx, struct pci_devinst *pi);
 	int	(*pe_resume)(struct vmctx *ctx, struct pci_devinst *pi);
+
 };
 #define PCI_EMUL_SET(x)   DATA_SET(pci_devemu_set, x);
 
@@ -92,6 +99,7 @@ struct pcibar {
 	enum pcibar_type	type;		/* io or memory */
 	uint64_t		size;
 	uint64_t		addr;
+	uint8_t			lobits;
 };
 
 #define PI_NAMESZ	40
@@ -102,7 +110,7 @@ struct msix_table_entry {
 	uint32_t	vector_control;
 } __packed;
 
-/* 
+/*
  * In case the structure is modified to hold extra information, use a define
  * for the size that should be emulated.
  */
@@ -148,10 +156,10 @@ struct pci_devinst {
 		int	table_count;
 		uint32_t pba_offset;
 		int	pba_size;
-		int	function_mask; 	
+		int	function_mask;
 		struct msix_table_entry *table;	/* allocated at runtime */
-		void	*pba_page;
-		int	pba_page_offset;
+		uint8_t *mapped_addr;
+		size_t	mapped_size;
 	} pi_msix;
 
 	void      *pi_arg;		/* devemu-private data */
@@ -236,6 +244,7 @@ int	pci_msix_enabled(struct pci_devinst *pi);
 int	pci_msix_table_bar(struct pci_devinst *pi);
 int	pci_msix_pba_bar(struct pci_devinst *pi);
 int	pci_msi_maxmsgnum(struct pci_devinst *pi);
+int	pci_parse_legacy_config(nvlist_t *nvl, const char *opt);
 int	pci_parse_slot(char *opt);
 void    pci_print_supported_devices();
 void	pci_populate_msicap(struct msicap *cap, int msgs, int nextptr);
@@ -254,21 +263,21 @@ int	pci_pause(struct vmctx *ctx, const char *dev_name);
 int	pci_resume(struct vmctx *ctx, const char *dev_name);
 #endif
 
-static __inline void 
+static __inline void
 pci_set_cfgdata8(struct pci_devinst *pi, int offset, uint8_t val)
 {
 	assert(offset <= PCI_REGMAX);
 	*(uint8_t *)(pi->pi_cfgdata + offset) = val;
 }
 
-static __inline void 
+static __inline void
 pci_set_cfgdata16(struct pci_devinst *pi, int offset, uint16_t val)
 {
 	assert(offset <= (PCI_REGMAX - 1) && (offset & 1) == 0);
 	*(uint16_t *)(pi->pi_cfgdata + offset) = val;
 }
 
-static __inline void 
+static __inline void
 pci_set_cfgdata32(struct pci_devinst *pi, int offset, uint32_t val)
 {
 	assert(offset <= (PCI_REGMAX - 3) && (offset & 3) == 0);
