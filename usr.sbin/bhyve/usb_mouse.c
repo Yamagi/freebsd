@@ -241,8 +241,6 @@ struct umouse_bos_desc umouse_bosd = {
 struct umouse_softc {
 	struct usb_hci *hci;
 
-	char	*opt;
-
 	struct umouse_report um_report;
 	int	newdata;
 	struct {
@@ -299,7 +297,7 @@ umouse_event(uint8_t button, int x, int y, void *arg)
 }
 
 static void *
-umouse_init(struct usb_hci *hci, char *opt)
+umouse_init(struct usb_hci *hci, nvlist_t *nvl)
 {
 	struct umouse_softc *sc;
 
@@ -307,7 +305,6 @@ umouse_init(struct usb_hci *hci, char *opt)
 	sc->hci = hci;
 
 	sc->hid.protocol = 1;	/* REPORT protocol */
-	sc->opt = strdup(opt);
 	pthread_mutex_init(&sc->mtx, NULL);
 	pthread_mutex_init(&sc->ev_mtx, NULL);
 
@@ -538,8 +535,8 @@ umouse_request(void *scarg, struct usb_data_xfer *xfer)
 		eshort = data->blen > 0;
 		break;
 
-	case UREQ(UR_GET_STATUS, UT_READ_INTERFACE): 
-	case UREQ(UR_GET_STATUS, UT_READ_ENDPOINT): 
+	case UREQ(UR_GET_STATUS, UT_READ_INTERFACE):
+	case UREQ(UR_GET_STATUS, UT_READ_ENDPOINT):
 		DPRINTF(("umouse: (UR_GET_STATUS, UT_READ_INTERFACE)"));
 		if (data != NULL && len > 1) {
 			USETW(udata, 0);
@@ -755,7 +752,7 @@ umouse_data_handler(void *scarg, struct usb_data_xfer *xfer, int dir,
 
 		sc->polling = 0;
 		pthread_mutex_unlock(&sc->mtx);
-	} else { 
+	} else {
 		USB_DATA_SET_ERRCODE(data, USB_STALL);
 		err = USB_ERR_STALLED;
 	}

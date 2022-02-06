@@ -166,6 +166,10 @@
     share
         atf             tags=package=tests
         ..
+        bhyve
+            kbdlayout
+            ..
+        ..
         bsdconfig
             media
             ..
