@@ -40,6 +40,8 @@ __FBSDID("$FreeBSD$");
 
 #include <security/audit/audit.h>
 
+#include <machine/reg.h>
+
 #include <arm64/linux/linux.h>
 #include <arm64/linux/linux_proto.h>
 #include <compat/linux/linux_dtrace.h>
