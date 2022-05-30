@@ -584,7 +584,7 @@ pci_vtblk_cfgread(void *vsc, int offset, int size, uint32_t *retval)
 	return (0);
 }
 
-struct pci_devemu pci_de_vblk = {
+static const struct pci_devemu pci_de_vblk = {
 	.pe_emu =	"virtio-blk",
 	.pe_init =	pci_vtblk_init,
 	.pe_legacy_config = blockif_legacy_config,
@@ -592,6 +592,8 @@ struct pci_devemu pci_de_vblk = {
 	.pe_barread =	vi_pci_read,
 #ifdef BHYVE_SNAPSHOT
 	.pe_snapshot =	vi_pci_snapshot,
+	.pe_pause =     vi_pci_pause,
+	.pe_resume =    vi_pci_resume,
 #endif
 };
 PCI_EMUL_SET(pci_de_vblk);
