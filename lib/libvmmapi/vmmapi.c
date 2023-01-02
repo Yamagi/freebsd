@@ -1074,19 +1074,44 @@ uint64_t *
 vm_get_stats(struct vmctx *ctx, int vcpu, struct timeval *ret_tv,
 	     int *ret_entries)
 {
-	int error;
+	static _Thread_local uint64_t *stats_buf;
+	static _Thread_local u_int stats_count;
+	uint64_t *new_stats;
+	struct vm_stats vmstats;
+	u_int count, index;
+	bool have_stats;
 
-	static struct vm_stats vmstats;
-
+	have_stats = false;
 	vmstats.cpuid = vcpu;
+	count = 0;
+	for (index = 0;; index += nitems(vmstats.statbuf)) {
+		vmstats.index = index;
+		if (ioctl(ctx->fd, VM_STATS, &vmstats) != 0)
+			break;
+		if (stats_count < index + vmstats.num_entries) {
+			new_stats = realloc(stats_buf,
+			    (index + vmstats.num_entries) * sizeof(uint64_t));
+			if (new_stats == NULL) {
+				errno = ENOMEM;
+				return (NULL);
+			}
+			stats_count = index + vmstats.num_entries;
+			stats_buf = new_stats;
+		}
+		memcpy(stats_buf + index, vmstats.statbuf,
+		    vmstats.num_entries * sizeof(uint64_t));
+		count += vmstats.num_entries;
+		have_stats = true;
 
-	error = ioctl(ctx->fd, VM_STATS, &vmstats);
-	if (error == 0) {
+		if (vmstats.num_entries != nitems(vmstats.statbuf))
+			break;
+	}
+	if (have_stats) {
 		if (ret_entries)
-			*ret_entries = vmstats.num_entries;
+			*ret_entries = count;
 		if (ret_tv)
 			*ret_tv = vmstats.tv;
-		return (vmstats.statbuf);
+		return (stats_buf);
 	} else
 		return (NULL);
 }
@@ -1443,14 +1468,17 @@ vm_copy_setup(struct vmctx *ctx, int vcpu, struct vm_guest_paging *paging,
 }
 
 void
-vm_copy_teardown(struct vmctx *ctx __unused, int vcpu __unused,
-    struct iovec *iov __unused, int iovcnt __unused)
+vm_copy_teardown(struct iovec *iov __unused, int iovcnt __unused)
 {
+	/*
+	 * Intentionally empty.  This is used by the instruction
+	 * emulation code shared with the kernel.  The in-kernel
+	 * version of this is non-empty.
+	 */
 }
 
 void
-vm_copyin(struct vmctx *ctx __unused, int vcpu __unused, struct iovec *iov,
-    void *vp, size_t len)
+vm_copyin(struct iovec *iov, void *vp, size_t len)
 {
 	const char *src;
 	char *dst;
@@ -1470,8 +1498,7 @@ vm_copyin(struct vmctx *ctx __unused, int vcpu __unused, struct iovec *iov,
 }
 
 void
-vm_copyout(struct vmctx *ctx __unused, int vcpu __unused, const void *vp,
-    struct iovec *iov, size_t len)
+vm_copyout(const void *vp, struct iovec *iov, size_t len)
 {
 	const char *src;
 	char *dst;
@@ -1644,9 +1671,8 @@ vm_rtc_gettime(struct vmctx *ctx, time_t *secs)
 }
 
 int
-vm_restart_instruction(void *arg, int vcpu)
+vm_restart_instruction(struct vmctx *ctx, int vcpu)
 {
-	struct vmctx *ctx = arg;
 
 	return (ioctl(ctx->fd, VM_RESTART_INSTRUCTION, &vcpu));
 }

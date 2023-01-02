@@ -18,6 +18,7 @@ SRCS=	\
 	atkbdc.c		\
 	acpi.c			\
 	audio.c			\
+	basl.c			\
 	bhyvegc.c		\
 	bhyverun.c		\
 	block_if.c		\
@@ -133,5 +134,10 @@ CFLAGS+=-DGDB_LOG
 
 WARNS?=	2
 
+# Disable thread safety analysis since it only finds very simple bugs and
+# yields many false positives.
+NO_WTHREAD_SAFETY=
+
 SUBDIR=	kbdlayout
+
 .include <bsd.prog.mk>
